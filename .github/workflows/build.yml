@@ -1,10 +1,13 @@
-name: GM Manager APK
+name: GM Manager - Complete Android Build
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -15,11 +18,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -27,18 +29,874 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Verify Flutter
+      - name: Create Flutter project
         run: |
-          flutter --version
-          dart --version
+          flutter create \
+            --project-name gmmanager \
+            --org com.gmmanager \
+            --platforms android \
+            .
 
-      - name: Get packages
+      - name: Write pubspec
+        run: |
+          cat > pubspec.yaml <<'EOF'
+          name: gmmanager
+          description: GM Manager - Personal AI and Social Media Manager
+          publish_to: "none"
+          version: 1.0.0+1
+
+          environment:
+            sdk: ">=3.9.0 <4.0.0"
+
+          dependencies:
+            flutter:
+              sdk: flutter
+            cupertino_icons: ^1.0.8
+            image_picker: ^1.2.3
+            shared_preferences: ^2.5.5
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^6.0.0
+
+          flutter:
+            uses-material-design: true
+          EOF
+
+      - name: Write complete GM Manager
+        run: |
+          cat > lib/main.dart <<'DART'
+          import 'dart:io';
+
+          import 'package:flutter/material.dart';
+          import 'package:image_picker/image_picker.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
+
+          void main() {
+            WidgetsFlutterBinding.ensureInitialized();
+            runApp(const GMManager());
+          }
+
+          class GMManager extends StatelessWidget {
+            const GMManager({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                title: 'GM Manager',
+                theme: ThemeData(
+                  useMaterial3: true,
+                  colorSchemeSeed: Colors.deepPurple,
+                  brightness: Brightness.dark,
+                  scaffoldBackgroundColor: const Color(0xFF0D0D12),
+                ),
+                home: const GMHome(),
+              );
+            }
+          }
+
+          class GMHome extends StatefulWidget {
+            const GMHome({super.key});
+
+            @override
+            State<GMHome> createState() => _GMHomeState();
+          }
+
+          class _GMHomeState extends State<GMHome> {
+            int index = 0;
+
+            final pages = const [
+              DashboardPage(),
+              ContentPage(),
+              AssistantPage(),
+              ToolsPage(),
+              SettingsPage(),
+            ];
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                body: SafeArea(
+                  child: IndexedStack(
+                    index: index,
+                    children: pages,
+                  ),
+                ),
+                bottomNavigationBar: NavigationBar(
+                  selectedIndex: index,
+                  onDestinationSelected: (value) {
+                    setState(() => index = value);
+                  },
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.dashboard_outlined),
+                      selectedIcon: Icon(Icons.dashboard),
+                      label: 'Home',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.grid_view_outlined),
+                      selectedIcon: Icon(Icons.grid_view),
+                      label: 'Content',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.smart_toy_outlined),
+                      selectedIcon: Icon(Icons.smart_toy),
+                      label: 'GM AI',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.auto_awesome_outlined),
+                      selectedIcon: Icon(Icons.auto_awesome),
+                      label: 'Tools',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.settings_outlined),
+                      selectedIcon: Icon(Icons.settings),
+                      label: 'Settings',
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+
+          class DashboardPage extends StatelessWidget {
+            const DashboardPage({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return CustomScrollView(
+                slivers: [
+                  const SliverAppBar.large(
+                    title: Text('GM Manager'),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _welcomeCard(context),
+                        const SizedBox(height: 18),
+                        const Text(
+                          'Manager',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 1.25,
+                          children: [
+                            _card(
+                              context,
+                              Icons.photo_library,
+                              'Posts',
+                              'Create and manage posts',
+                            ),
+                            _card(
+                              context,
+                              Icons.auto_stories,
+                              'Stories',
+                              'Create Instagram stories',
+                            ),
+                            _card(
+                              context,
+                              Icons.collections,
+                              'Collage',
+                              'Build photo collages',
+                            ),
+                            _card(
+                              context,
+                              Icons.star,
+                              'Highlights',
+                              'Manage highlights',
+                            ),
+                            _card(
+                              context,
+                              Icons.edit_note,
+                              'Captions',
+                              'Write better captions',
+                            ),
+                            _card(
+                              context,
+                              Icons.calendar_month,
+                              'Planner',
+                              'Plan your content',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 22),
+                        _section(
+                          context,
+                          'Quick Actions',
+                          [
+                            _action(
+                              Icons.add_photo_alternate,
+                              'New Post',
+                              () => _pickImage(context),
+                            ),
+                            _action(
+                              Icons.camera_alt,
+                              'Story',
+                              () => _pickCamera(context),
+                            ),
+                            _action(
+                              Icons.auto_awesome,
+                              'AI Assistant',
+                              () {},
+                            ),
+                          ],
+                        ),
+                      ]),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            Widget _welcomeCard(BuildContext context) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 30,
+                        child: Icon(
+                          Icons.auto_awesome,
+                          size: 30,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Welcome to GM',
+                              style: TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 5),
+                            Text(
+                              'Your personal AI and social-media manager.',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            Widget _card(
+              BuildContext context,
+              IconData icon,
+              String title,
+              String subtitle,
+            ) {
+              return Card(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {},
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(icon, size: 30),
+                        const SizedBox(height: 10),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            Widget _section(
+              BuildContext context,
+              String title,
+              List<Widget> children,
+            ) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...children,
+                ],
+              );
+            }
+
+            Widget _action(
+              IconData icon,
+              String title,
+              VoidCallback action,
+            ) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: FilledButton.tonalIcon(
+                  onPressed: action,
+                  icon: Icon(icon),
+                  label: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(title),
+                  ),
+                ),
+              );
+            }
+
+            Future<void> _pickImage(BuildContext context) async {
+              final picker = ImagePicker();
+              final image =
+                  await picker.pickImage(source: ImageSource.gallery);
+
+              if (image == null || !context.mounted) return;
+
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ImageEditorPage(path: image.path),
+                ),
+              );
+            }
+
+            Future<void> _pickCamera(BuildContext context) async {
+              final picker = ImagePicker();
+              final image =
+                  await picker.pickImage(source: ImageSource.camera);
+
+              if (image == null || !context.mounted) return;
+
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ImageEditorPage(path: image.path),
+                ),
+              );
+            }
+          }
+
+          class ContentPage extends StatelessWidget {
+            const ContentPage({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return CustomScrollView(
+                slivers: [
+                  const SliverAppBar.large(
+                    title: Text('Content Manager'),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _tile(
+                          context,
+                          Icons.photo,
+                          'Posts',
+                          'Manage your Instagram posts',
+                        ),
+                        _tile(
+                          context,
+                          Icons.auto_stories,
+                          'Stories',
+                          'Create and organize stories',
+                        ),
+                        _tile(
+                          context,
+                          Icons.collections,
+                          'Collages',
+                          'Combine multiple photos',
+                        ),
+                        _tile(
+                          context,
+                          Icons.star,
+                          'Highlights',
+                          'Organize your profile highlights',
+                        ),
+                        _tile(
+                          context,
+                          Icons.schedule,
+                          'Content Planner',
+                          'Plan future content',
+                        ),
+                        _tile(
+                          context,
+                          Icons.favorite_border,
+                          'Saved Ideas',
+                          'Keep ideas for later',
+                        ),
+                      ]),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            Widget _tile(
+              BuildContext context,
+              IconData icon,
+              String title,
+              String subtitle,
+            ) {
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: CircleAvatar(child: Icon(icon)),
+                  title: Text(title),
+                  subtitle: Text(subtitle),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
+              );
+            }
+          }
+
+          class AssistantPage extends StatefulWidget {
+            const AssistantPage({super.key});
+
+            @override
+            State<AssistantPage> createState() => _AssistantPageState();
+          }
+
+          class _AssistantPageState extends State<AssistantPage> {
+            final controller = TextEditingController();
+
+            final messages = <String>[
+              'Hi! I am GM, your personal content manager.',
+              'Tell me what you want to create or manage.',
+            ];
+
+            void send() {
+              final text = controller.text.trim();
+              if (text.isEmpty) return;
+
+              setState(() {
+                messages.add('You: $text');
+                messages.add(
+                  'GM: I can help you plan posts, stories, captions, '
+                  'collages, highlights and content ideas.',
+                );
+                controller.clear();
+              });
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('GM AI Assistant'),
+                ),
+                body: Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: messages.length,
+                        itemBuilder: (_, i) {
+                          return Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Text(messages[i]),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: controller,
+                                decoration: const InputDecoration(
+                                  hintText: 'Ask GM...',
+                                  border: OutlineInputBorder(),
+                                ),
+                                onSubmitted: (_) => send(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton.filled(
+                              onPressed: send,
+                              icon: const Icon(Icons.send),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+
+          class ToolsPage extends StatelessWidget {
+            const ToolsPage({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              final tools = [
+                ['Photo Editor', Icons.photo_filter],
+                ['Collage Maker', Icons.dashboard_customize],
+                ['Story Maker', Icons.auto_stories],
+                ['Caption Generator', Icons.edit],
+                ['Hashtag Ideas', Icons.tag],
+                ['Content Ideas', Icons.lightbulb],
+                ['Post Planner', Icons.calendar_month],
+                ['Highlight Manager', Icons.star],
+              ];
+
+              return CustomScrollView(
+                slivers: [
+                  const SliverAppBar.large(
+                    title: Text('GM Tools'),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverGrid(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final tool = tools[index];
+
+                          return Card(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () {},
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(tool[1] as IconData, size: 34),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    tool[0] as String,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        childCount: tools.length,
+                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+          }
+
+          class SettingsPage extends StatefulWidget {
+            const SettingsPage({super.key});
+
+            @override
+            State<SettingsPage> createState() => _SettingsPageState();
+          }
+
+          class _SettingsPageState extends State<SettingsPage> {
+            bool notifications = true;
+            bool autoSave = true;
+            bool darkMode = true;
+
+            @override
+            void initState() {
+              super.initState();
+              _load();
+            }
+
+            Future<void> _load() async {
+              final prefs = await SharedPreferences.getInstance();
+
+              if (!mounted) return;
+
+              setState(() {
+                notifications =
+                    prefs.getBool('notifications') ?? true;
+                autoSave = prefs.getBool('autosave') ?? true;
+                darkMode = prefs.getBool('darkmode') ?? true;
+              });
+            }
+
+            Future<void> _save(String key, bool value) async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool(key, value);
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return CustomScrollView(
+                slivers: [
+                  const SliverAppBar.large(
+                    title: Text('Settings'),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        const Text(
+                          'General',
+                          style: TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SwitchListTile(
+                          title: const Text('Notifications'),
+                          subtitle:
+                              const Text('Receive GM reminders'),
+                          value: notifications,
+                          onChanged: (value) {
+                            setState(() => notifications = value);
+                            _save('notifications', value);
+                          },
+                        ),
+                        SwitchListTile(
+                          title: const Text('Auto Save'),
+                          subtitle:
+                              const Text('Automatically save projects'),
+                          value: autoSave,
+                          onChanged: (value) {
+                            setState(() => autoSave = value);
+                            _save('autosave', value);
+                          },
+                        ),
+                        SwitchListTile(
+                          title: const Text('Dark Mode'),
+                          value: darkMode,
+                          onChanged: (value) {
+                            setState(() => darkMode = value);
+                            _save('darkmode', value);
+                          },
+                        ),
+                        const Divider(height: 30),
+                        const Text(
+                          'Instagram Manager',
+                          style: TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const ListTile(
+                          leading: Icon(Icons.link),
+                          title: Text('Instagram Account'),
+                          subtitle: Text('Not connected'),
+                          trailing: Icon(Icons.chevron_right),
+                        ),
+                        const ListTile(
+                          leading: Icon(Icons.security),
+                          title: Text('Privacy & Security'),
+                          trailing: Icon(Icons.chevron_right),
+                        ),
+                        const ListTile(
+                          leading: Icon(Icons.info_outline),
+                          title: Text('About GM Manager'),
+                          subtitle: Text('Version 1.0.0'),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ],
+              );
+            }
+          }
+
+          class ImageEditorPage extends StatefulWidget {
+            final String path;
+
+            const ImageEditorPage({
+              super.key,
+              required this.path,
+            });
+
+            @override
+            State<ImageEditorPage> createState() =>
+                _ImageEditorPageState();
+          }
+
+          class _ImageEditorPageState extends State<ImageEditorPage> {
+            double brightness = 0;
+            double rotation = 0;
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('GM Photo Editor'),
+                  actions: [
+                    IconButton(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Project saved locally.'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.save),
+                    ),
+                  ],
+                ),
+                body: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 1,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          color: Colors.black,
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Transform.rotate(
+                          angle: rotation,
+                          child: ColorFiltered(
+                            colorFilter: ColorFilter.matrix([
+                              1,
+                              0,
+                              0,
+                              0,
+                              brightness,
+                              0,
+                              1,
+                              0,
+                              0,
+                              brightness,
+                              0,
+                              0,
+                              1,
+                              0,
+                              brightness,
+                              0,
+                              0,
+                              0,
+                              1,
+                              0,
+                            ]),
+                            child: Image.file(
+                              File(widget.path),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Brightness',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Slider(
+                      value: brightness,
+                      min: -80,
+                      max: 80,
+                      onChanged: (value) {
+                        setState(() => brightness = value);
+                      },
+                    ),
+                    const Text(
+                      'Rotation',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Slider(
+                      value: rotation,
+                      min: -3.14,
+                      max: 3.14,
+                      onChanged: (value) {
+                        setState(() => rotation = value);
+                      },
+                    ),
+                    FilledButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.auto_awesome),
+                      label: const Text('Enhance with GM'),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.tonalIcon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.layers),
+                      label: const Text('Add to Collage'),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.tonalIcon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.auto_stories),
+                      label: const Text('Create Story'),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+          DART
+
+      - name: Add Android internet permission
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          text = p.read_text()
+
+          permission = '<uses-permission android:name="android.permission.INTERNET"/>'
+
+          if permission not in text:
+              text = text.replace(
+                  '<application',
+                  permission + '\n    <application',
+                  1
+              )
+
+          p.write_text(text)
+          PY
+
+      - name: Get dependencies
         run: flutter pub get
 
       - name: Analyze
         run: flutter analyze
 
-      - name: Build APK
+      - name: Build release APK
         run: flutter build apk --release
 
       - name: Upload APK
